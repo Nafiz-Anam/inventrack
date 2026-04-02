@@ -1,0 +1,1826 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "prisma-express-typescript-boilerplate API Documentation",
+    "version": "1.0.0",
+    "description": "REST API Boilerplate with Node JS, TypeScript, Express and Prisma",
+    "contact": {
+      "name": "API Support",
+      "email": "support@example.com"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://github.com/antonio-lazaro/prisma-express-typescript-boilerplate.git"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/v1",
+      "description": "Development server"
+    },
+    {
+      "url": "https://api.example.com/v1",
+      "description": "Production server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Authentication endpoints"
+    },
+    {
+      "name": "Users",
+      "description": "User management endpoints"
+    },
+    {
+      "name": "Health",
+      "description": "Health check endpoints"
+    },
+    {
+      "name": "Device Management",
+      "description": "User device and session management"
+    },
+    {
+      "name": "Two-Factor Authentication",
+      "description": "2FA/MFA management endpoints"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Enter your JWT token in the format: Bearer <token>"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "user@example.com"
+          },
+          "name": {
+            "type": "string",
+            "example": "John Doe"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["USER", "ADMIN"],
+            "example": "USER"
+          },
+          "isEmailVerified": {
+            "type": "boolean",
+            "example": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-01-01T00:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-01-01T00:00:00.000Z"
+          }
+        },
+        "required": ["id", "email", "role", "isEmailVerified", "createdAt", "updatedAt"]
+      },
+      "UserCreate": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "user@example.com"
+          },
+          "name": {
+            "type": "string",
+            "example": "John Doe"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 8,
+            "example": "password123"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["USER", "ADMIN"],
+            "default": "USER",
+            "example": "USER"
+          }
+        },
+        "required": ["email", "password"]
+      },
+      "UserUpdate": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "user@example.com"
+          },
+          "name": {
+            "type": "string",
+            "example": "John Doe"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["USER", "ADMIN"],
+            "example": "USER"
+          }
+        }
+      },
+      "Token": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "expires": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-01-01T00:30:00.000Z"
+          }
+        },
+        "required": ["token", "expires"]
+      },
+      "AuthTokens": {
+        "type": "object",
+        "properties": {
+          "access": {
+            "$ref": "#/components/schemas/Token"
+          },
+          "refresh": {
+            "$ref": "#/components/schemas/Token"
+          }
+        },
+        "required": ["access", "refresh"]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "user@example.com"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "example": "password123"
+          }
+        },
+        "required": ["email", "password"]
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "user@example.com"
+          },
+          "name": {
+            "type": "string",
+            "example": "John Doe"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 8,
+            "example": "password123"
+          }
+        },
+        "required": ["email", "name", "password"]
+      },
+      "RefreshTokenRequest": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          }
+        },
+        "required": ["refreshToken"]
+      },
+      "ForgotPasswordRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "user@example.com"
+          }
+        },
+        "required": ["email"]
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "reset-token-here"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 8,
+            "example": "newpassword123"
+          }
+        },
+        "required": ["token", "password"]
+      },
+      "VerifyEmailRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "verification-token-here"
+          }
+        },
+        "required": ["token"]
+      },
+      "VerifyEmailOtpRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "example": "clv1abcde0001xyz1234"
+          },
+          "otp": {
+            "type": "string",
+            "example": "123456"
+          }
+        },
+        "required": ["userId", "otp"]
+      },
+      "VerifyEmailOtpResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Email verified successfully"
+          }
+        },
+        "required": ["message"]
+      },
+      "HealthCheck": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2023-01-01T00:00:00.000Z"
+          },
+          "uptime": {
+            "type": "number",
+            "example": 3600
+          },
+          "database": {
+            "type": "string",
+            "example": "connected"
+          },
+          "version": {
+            "type": "string",
+            "example": "1.0.0"
+          },
+          "environment": {
+            "type": "string",
+            "example": "development"
+          }
+        },
+        "required": ["status", "timestamp", "uptime", "database"]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 400
+          },
+          "message": {
+            "type": "string",
+            "example": "Bad Request"
+          },
+          "stack": {
+            "type": "string",
+            "description": "Only included in development environment",
+            "example": "Error: Bad Request\n    at ..."
+          }
+        },
+        "required": ["code", "message"]
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "limit": {
+            "type": "integer",
+            "example": 10
+          },
+          "totalPages": {
+            "type": "integer",
+            "example": 5
+          },
+          "totalResults": {
+            "type": "integer",
+            "example": 50
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "example": true
+          },
+          "hasPrevPage": {
+            "type": "boolean",
+            "example": false
+          }
+        }
+      },
+      "PaginatedResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/User"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      }
+    },
+    "responses": {
+      "Success": {
+        "description": "Success",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "Operation completed successfully"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Created": {
+        "description": "Created successfully",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "Resource created successfully"
+                }
+              }
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Bad Request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "code": 400,
+              "message": "Bad Request"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Unauthorized",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "code": 401,
+              "message": "Please authenticate"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Forbidden",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "code": 403,
+              "message": "Forbidden"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "code": 404,
+              "message": "Not found"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Conflict",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "code": 409,
+              "message": "Resource already exists"
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer",
+                  "example": 400
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Validation Error"
+                },
+                "errors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "field": {
+                        "type": "string",
+                        "example": "email"
+                      },
+                      "message": {
+                        "type": "string",
+                        "example": "Email is required"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "Internal Server Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "code": 500,
+              "message": "Internal Server Error"
+            }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "Service Unavailable",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "code": 503,
+              "message": "Service Unavailable"
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/auth/verify-email-otp": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Verify email using OTP",
+        "description": "Verify a user's email address using a 6-digit OTP sent to their email after registration.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEmailOtpRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email verified successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyEmailOtpResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or expired OTP"
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "summary": "Register a new user",
+        "description": "Create a new user account with email, name, and password. The user will be created with USER role by default.",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              },
+              "example": {
+                "email": "newuser@example.com",
+                "name": "John Doe",
+                "password": "password123"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    },
+                    "tokens": {
+                      "$ref": "#/components/schemas/AuthTokens"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "User registered successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Login user",
+        "description": "Authenticate user with email and password to receive access and refresh tokens.",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              },
+              "example": {
+                "email": "user@example.com",
+                "password": "password123"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    },
+                    "tokens": {
+                      "$ref": "#/components/schemas/AuthTokens"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Login successful"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": 401,
+                  "message": "Invalid email or password"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "summary": "Logout user",
+        "description": "Invalidate the refresh token to log out the user.",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenRequest"
+              },
+              "example": {
+                "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Logout successful"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/auth/refresh-tokens": {
+      "post": {
+        "summary": "Refresh authentication tokens",
+        "description": "Get new access and refresh tokens using a valid refresh token.",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenRequest"
+              },
+              "example": {
+                "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens refreshed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokens"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/auth/forgot-password": {
+      "post": {
+        "summary": "Request password reset",
+        "description": "Send a password reset email to the user's email address.",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              },
+              "example": {
+                "email": "user@example.com"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset email sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Password reset email sent"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "summary": "Reset password",
+        "description": "Reset user password using the token received via email.",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              },
+              "example": {
+                "token": "reset-token-here",
+                "password": "newpassword123"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Password reset successful"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/auth/send-verification-email": {
+      "post": {
+        "summary": "Send email verification",
+        "description": "Send a verification email to the authenticated user's email address.",
+        "tags": ["Auth"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verification email sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Verification email sent"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "description": "Email already verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "code": 409,
+                  "message": "Email already verified"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/verify-email": {
+      "post": {
+        "summary": "Verify email address",
+        "description": "Verify user's email address using the token received via email.",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEmailRequest"
+              },
+              "example": {
+                "token": "verification-token-here"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email verified successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Email verified successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/devices": {
+      "get": {
+        "summary": "Get user's active devices",
+        "description": "Retrieve all active device sessions for the authenticated user",
+        "tags": ["Device Management"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Devices retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "example": 200
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Devices retrieved successfully"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Device ID"
+                          },
+                          "deviceId": {
+                            "type": "string",
+                            "description": "Unique device identifier"
+                          },
+                          "deviceName": {
+                            "type": "string",
+                            "description": "Human-readable device name"
+                          },
+                          "ipAddress": {
+                            "type": "string",
+                            "description": "IP address of the device"
+                          },
+                          "userAgent": {
+                            "type": "string",
+                            "description": "User agent string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "When the device was created"
+                          },
+                          "lastUsed": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "When the device was last used"
+                          },
+                          "isTrusted": {
+                            "type": "boolean",
+                            "description": "Whether this device is trusted"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Logout from all other devices",
+        "description": "Revoke access for all devices except the current one",
+        "tags": ["Device Management"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["currentDeviceId"],
+                "properties": {
+                  "currentDeviceId": {
+                    "type": "string",
+                    "description": "ID of the current device to keep",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "All other devices logged out successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "removedCount": {
+                      "type": "integer",
+                      "description": "Number of devices removed",
+                      "example": 2
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/devices/sessions": {
+      "get": {
+        "summary": "Get device sessions",
+        "description": "Retrieve all active device sessions for the authenticated user",
+        "tags": ["Device Management"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device sessions retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "deviceId": {
+                        "type": "string",
+                        "description": "Unique device identifier"
+                      },
+                      "deviceName": {
+                        "type": "string",
+                        "description": "Human-readable device name"
+                      },
+                      "ipAddress": {
+                        "type": "string",
+                        "description": "IP address of the device"
+                      },
+                      "userAgent": {
+                        "type": "string",
+                        "description": "User agent string"
+                      },
+                      "isActive": {
+                        "type": "boolean",
+                        "description": "Whether the session is active"
+                      },
+                      "lastActivity": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Last activity timestamp"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/devices/limit": {
+      "get": {
+        "summary": "Check device limit",
+        "description": "Check if user has reached the device limit",
+        "tags": ["Device Management"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 3
+            },
+            "description": "Maximum number of devices allowed"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device limit check completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hasReachedLimit": {
+                      "type": "boolean",
+                      "description": "Whether user has reached device limit",
+                      "example": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/devices/{deviceId}": {
+      "delete": {
+        "summary": "Remove specific device",
+        "description": "Revoke access for a specific device session",
+        "tags": ["Device Management"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deviceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Device ID to remove",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Device removed successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/devices/{deviceId}/trust": {
+      "post": {
+        "summary": "Trust device",
+        "description": "Mark a device as trusted",
+        "tags": ["Device Management"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deviceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Device ID to trust",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device trusted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Device ID"
+                    },
+                    "isTrusted": {
+                      "type": "boolean",
+                      "description": "Trust status",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/two-factor/setup": {
+      "post": {
+        "summary": "Setup 2FA",
+        "description": "Generate a new TOTP secret and QR code for 2FA setup",
+        "tags": ["Two-Factor Authentication"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "2FA setup initiated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "example": 200
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "2FA setup initiated successfully"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "secret": {
+                          "type": "string",
+                          "description": "TOTP secret key"
+                        },
+                        "qrCode": {
+                          "type": "string",
+                          "description": "QR code data URL"
+                        },
+                        "backupCodes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Backup codes for account recovery"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/two-factor/enable": {
+      "post": {
+        "summary": "Enable 2FA",
+        "description": "Enable 2FA for the authenticated user",
+        "tags": ["Two-Factor Authentication"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token"],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "6-digit TOTP token from authenticator app",
+                    "example": "123456"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "2FA enabled successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/two-factor/disable": {
+      "post": {
+        "summary": "Disable 2FA",
+        "description": "Disable 2FA for the authenticated user",
+        "tags": ["Two-Factor Authentication"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token"],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "6-digit TOTP token from authenticator app",
+                    "example": "123456"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "2FA disabled successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/two-factor/regenerate-backup-codes": {
+      "post": {
+        "summary": "Regenerate backup codes",
+        "description": "Generate new backup codes for account recovery",
+        "tags": ["Two-Factor Authentication"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token"],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "6-digit TOTP token from authenticator app",
+                    "example": "123456"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Backup codes regenerated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "example": 200
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Backup codes regenerated successfully"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "backupCodes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "New backup codes"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/two-factor/status": {
+      "get": {
+        "summary": "Get 2FA status",
+        "description": "Get the current 2FA status for the authenticated user",
+        "tags": ["Two-Factor Authentication"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "2FA status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "example": 200
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "2FA status retrieved successfully"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean",
+                          "description": "Whether 2FA is enabled"
+                        },
+                        "verified": {
+                          "type": "boolean",
+                          "description": "Whether 2FA setup is completed"
+                        },
+                        "hasBackupCodes": {
+                          "type": "boolean",
+                          "description": "Whether backup codes are available"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/users": {
+      "post": {
+        "summary": "Create a new user",
+        "description": "Only administrators can create new users. This endpoint creates a user with the specified role and details.",
+        "tags": ["Users"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreate"
+              },
+              "example": {
+                "email": "newuser@example.com",
+                "name": "New User",
+                "password": "password123",
+                "role": "USER"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "User created successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      },
+      "get": {
+        "summary": "Get all users with pagination",
+        "description": "Retrieve a paginated list of users. Only administrators can access this endpoint.",
+        "tags": ["Users"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "name",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter users by name (partial match)",
+            "example": "john"
+          },
+          {
+            "in": "query",
+            "name": "email",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter users by email (partial match)",
+            "example": "user@example.com"
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "schema": {
+              "type": "string",
+              "enum": ["USER", "ADMIN"]
+            },
+            "description": "Filter users by role",
+            "example": "USER"
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Sort by field in format field:direction (e.g., name:asc, createdAt:desc)",
+            "example": "createdAt:desc"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "default": 10,
+            "description": "Maximum number of users per page",
+            "example": 20
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "default": 1,
+            "description": "Page number",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of users retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/users/{userId}": {
+      "get": {
+        "summary": "Get a specific user by ID",
+        "description": "Retrieve user details by ID. Users can only access their own information unless they are administrators.",
+        "tags": ["Users"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "User ID",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User details retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update a user",
+        "description": "Update user information. Users can only update their own information unless they are administrators.",
+        "tags": ["Users"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "User ID",
+            "example": 1
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdate"
+              },
+              "example": {
+                "name": "Updated Name",
+                "email": "updated@example.com",
+                "role": "ADMIN"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a user",
+        "description": "Permanently delete a user. Only administrators can delete users.",
+        "tags": ["Users"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "User ID",
+            "example": 1
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "User deleted successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    }
+  }
+}

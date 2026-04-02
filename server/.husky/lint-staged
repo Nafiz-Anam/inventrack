@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "🔍 Running lint-staged..."
+
+# Run prettier to format staged files
+echo "📝 Formatting staged files..."
+npx prettier --write --staged
+
+# Run eslint on staged files
+echo "🔧 Running ESLint on staged files..."
+npx eslint --staged --fix
+
+# Run type checking
+echo "🏗️  Running TypeScript type check..."
+npx tsc --noEmit
+
+echo "✅ Lint-staged checks completed!"

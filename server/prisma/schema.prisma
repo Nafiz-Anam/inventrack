@@ -1,0 +1,728 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum IPSecurityRuleType {
+  WHITELIST
+  BLACKLIST
+  SUSPICIOUS
+}
+
+model IPSecurityRule {
+  id          String   @id @default(cuid())
+  ipAddress   String   @map("ip_address")
+  cidrRange   String?  @map("cidr_range")
+  ruleType    IPSecurityRuleType @map("rule_type")
+  reason      String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdBy   String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by")
+  userId      String?  @map("user_id")
+  
+  // Relations
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("ip_security_rules")
+}
+
+model IPSecurityAnalytics {
+  id          String   @id @default(cuid())
+  ipAddress   String   @map("ip_address")
+  countryCode  String?  @map("country_code")
+  reputation  String?
+  requestCount Int      @default(0) @map("request_count")
+  firstSeen   DateTime @default(now()) @map("first_seen")
+  lastSeen    DateTime @default(now()) @map("last_seen")
+  isBlocked   Boolean  @default(false) @map("is_blocked")
+  blockReason String?  @map("block_reason")
+  riskScore   Float    @default(0.0) @map("risk_score")
+
+  @@map("ip_security_analytics")
+}
+
+model User {
+  id                  String   @id @default(cuid())
+  email               String   @unique
+  name                String?
+  password            String
+  role                Role
+  isEmailVerified     Boolean  @default(false)
+  failedLoginAttempts Int      @default(0)
+  lockoutUntil        DateTime?
+  lastLoginAt         DateTime?
+  twoFactorEnabled    Boolean  @default(false)
+  twoFactorSecret     String?
+  twoFactorBackupCodes String[]
+  twoFactorVerified   Boolean  @default(false)
+  
+  // Profile fields
+  phone               String?
+  phoneCode           String?
+  country             String?
+  state               String?
+  city                String?
+  address             String?
+  profilePicture      String?
+  dateOfBirth         DateTime?
+  gender              Gender?
+  
+  // Security fields
+  forcePasswordChange Boolean  @default(false)
+  passwordChangedAt   DateTime?
+  isActive            Boolean  @default(true)
+  isLocked            Boolean  @default(false)
+  
+  // Preferences
+  emailNotifications  Json?    @default("{}")
+  pushNotifications   Json?    @default("{}")
+  preferences         Json?    @default("{}")
+  
+  // Timestamps
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  // Relations
+  tokens              Token[]
+  securityLogs        SecurityLog[]
+  userActivities      UserActivity[]
+  userSessions        UserSession[]
+  devices             Device[]
+  notifications       Notification[]
+  passwordHistory     PasswordHistory[]
+  otps                Otp[]
+  ipSecurityRules     IPSecurityRule[]
+  
+  // Phase 1 Core Features Relations
+  socialAccounts      SocialAccount[]
+  userRoles           UserRole[]
+  auditLogs           AuditLog[]
+  dataProcessingRecords DataProcessingRecord[]
+  apiKeys             ApiKey[]
+
+  // Inventory & Order Relations
+  createdCategories    Category[]          @relation("CategoryCreator")
+  createdProducts      Product[]           @relation("ProductCreator")
+  createdOrders        Order[]             @relation("OrderCreator")
+  restockedItems       RestockQueue[]      @relation("RestockedBy")
+  inventoryActivities  InventoryActivity[] @relation("ActivityLogUser")
+
+  @@map("users")
+}
+
+model Token {
+  id          String    @id @default(cuid())
+  token       String    @unique
+  type        TokenType
+  expires     DateTime
+  blacklisted Boolean   @default(false)
+  
+  // Device management fields
+  deviceId    String?   // Unique identifier for the device/session
+  deviceName  String?   // Human-readable device name
+  ipAddress   String?   // IP address of the device
+  userAgent   String?   // User agent string
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  
+  @@map("tokens")
+}
+
+model SecurityLog {
+  id        String           @id @default(cuid())
+  userId    String?
+  email     String?
+  ipAddress String
+  userAgent String
+  eventType SecurityEventType
+  details   Json?
+  success   Boolean
+  timestamp DateTime         @default(now())
+  
+  // Relations
+  user      User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("security_logs")
+}
+
+model UserActivity {
+  id          String       @id @default(cuid())
+  userId      String
+  activityType ActivityType
+  description String?
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime     @default(now())
+  
+  // Relations
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("user_activities")
+}
+
+model UserSession {
+  id          String   @id @default(cuid())
+  userId      String
+  sessionId   String   @unique
+  deviceId    String?
+  deviceName  String?
+  ipAddress   String?
+  userAgent   String?
+  isActive    Boolean  @default(true)
+  lastActivity DateTime @default(now())
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("user_sessions")
+}
+
+model Device {
+  id          String   @id @default(cuid())
+  userId      String
+  deviceId    String   @unique
+  deviceName  String
+  deviceType  DeviceType
+  ipAddress   String?
+  userAgent   String?
+  isTrusted   Boolean  @default(false)
+  lastUsed    DateTime @default(now())
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("devices")
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  type        NotificationType
+  title       String
+  message     String
+  isRead      Boolean          @default(false)
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+  
+  // Relations
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("notifications")
+}
+
+model PasswordHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  password    String
+  changedAt   DateTime @default(now())
+  
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("password_history")
+}
+
+model Otp {
+  id         String   @id @default(cuid())
+  userId     String
+  otp        String
+  type       OtpType
+  expiresAt  DateTime
+  consumed   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Enums
+enum Role {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+enum TokenType {
+  ACCESS
+  REFRESH
+  RESET_PASSWORD
+  VERIFY_EMAIL
+  TWO_FACTOR
+}
+
+enum SecurityEventType {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  REGISTER
+  PASSWORD_RESET_REQUESTED
+  PASSWORD_RESET_COMPLETED
+  PASSWORD_CHANGE
+  EMAIL_VERIFIED
+  ACCOUNT_LOCKED
+  ACCOUNT_UNLOCKED
+  TWO_FACTOR_ENABLED
+  TWO_FACTOR_DISABLED
+  TWO_FACTOR_VERIFIED
+  SUSPICIOUS_ACTIVITY
+  RATE_LIMIT_EXCEEDED
+  DEVICE_ADDED
+  DEVICE_REMOVED
+  SESSION_CREATED
+  SESSION_TERMINATED
+}
+
+enum ActivityType {
+  LOGIN
+  LOGOUT
+  PASSWORD_CHANGE
+  PROFILE_UPDATE
+  EMAIL_VERIFICATION
+  TWO_FACTOR_SETUP
+  DEVICE_ADDED
+  DEVICE_REMOVED
+  SESSION_CREATED
+  SESSION_TERMINATED
+  ACCOUNT_LOCKED
+  ACCOUNT_UNLOCKED
+}
+
+enum NotificationType {
+  LOGIN_ALERT
+  PASSWORD_CHANGE
+  EMAIL_VERIFICATION
+  TWO_FACTOR_SETUP
+  ACCOUNT_LOCKED
+  SECURITY_ALERT
+  SYSTEM_UPDATE
+  WELCOME
+}
+
+enum DeviceType {
+  MOBILE
+  TABLET
+  DESKTOP
+  UNKNOWN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum OtpType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+// Phase 1 Core Features Enums
+enum Permission {
+  // User Management
+  USER_READ
+  USER_CREATE
+  USER_UPDATE
+  USER_DELETE
+  // Role Management  
+  ROLE_READ
+  ROLE_CREATE
+  ROLE_UPDATE
+  ROLE_DELETE
+  // System Management
+  SYSTEM_READ
+  SYSTEM_UPDATE
+  SYSTEM_CONFIGURE
+  // Analytics
+  ANALYTICS_READ
+  ANALYTICS_EXPORT
+  // Security
+  SECURITY_READ
+  SECURITY_MANAGE
+  // Social Auth
+  SOCIAL_AUTH_READ
+  SOCIAL_AUTH_MANAGE
+  // Audit Logs
+  AUDIT_READ
+  AUDIT_EXPORT
+  // Session Management
+  SESSION_READ
+  SESSION_MANAGE
+  // Inventory & Orders
+  CATEGORY_READ
+  CATEGORY_CREATE
+  CATEGORY_UPDATE
+  CATEGORY_DELETE
+  PRODUCT_READ
+  PRODUCT_CREATE
+  PRODUCT_UPDATE
+  PRODUCT_DELETE
+  ORDER_READ
+  ORDER_CREATE
+  ORDER_UPDATE
+  ORDER_CANCEL
+  RESTOCK_READ
+  RESTOCK_MANAGE
+  DASHBOARD_READ
+  ACTIVITY_LOG_READ
+}
+
+// Phase 1 Core Features Models
+
+// Social Authentication Models
+model SocialAccount {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  provider    String   // 'google', 'github', 'facebook', etc.
+  providerId  String   @map("provider_id") // Unique ID from provider
+  accessToken String?  @map("access_token")
+  refreshToken String? @map("refresh_token")
+  scope       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([provider, providerId])
+  @@map("social_accounts")
+}
+
+// RBAC Models
+model RoleModel {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  permissions RolePermission[]
+  userRoles   UserRole[]
+  
+  @@map("roles")
+}
+
+model PermissionModel {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  resource    String   // 'user', 'role', 'system', etc.
+  action      String   // 'read', 'create', 'update', 'delete'
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  rolePermissions RolePermission[]
+  
+  @@unique([resource, action])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String @id @default(cuid())
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  role       RoleModel       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission PermissionModel @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  roleId    String   @map("role_id")
+  assignedBy String? @map("assigned_by")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+  expiresAt DateTime? @map("expires_at")
+  
+  // Relations
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role RoleModel @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+// Password Management Models
+model PasswordPolicy {
+  id                      String   @id @default(cuid())
+  name                    String   @unique
+  minLength               Int      @default(8) @map("min_length")
+  requireUppercase        Boolean  @default(true) @map("require_uppercase")
+  requireLowercase        Boolean  @default(true) @map("require_lowercase")
+  requireNumbers          Boolean  @default(true) @map("require_numbers")
+  requireSpecialChars     Boolean  @default(true) @map("require_special_chars")
+  preventCommonPasswords  Boolean  @default(true) @map("prevent_common_passwords")
+  preventUserInfo         Boolean  @default(true) @map("prevent_user_info")
+  maxAge                  Int?     @map("max_age") // Days
+  historyCount            Int      @default(5) @map("history_count")
+  breachCheckEnabled      Boolean  @default(true) @map("breach_check_enabled")
+  isActive                Boolean  @default(true) @map("is_active")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+  
+  @@map("password_policies")
+}
+
+model PasswordBreachCheck {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  passwordHash String  @map("password_hash")
+  isBreached  Boolean  @map("is_breached")
+  checkedAt   DateTime @default(now()) @map("checked_at")
+  
+  @@map("password_breach_checks")
+}
+
+// Audit Logging Models
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?  @map("user_id")
+  action      String   // 'CREATE', 'UPDATE', 'DELETE', 'LOGIN', etc.
+  resource    String   // 'user', 'role', 'permission', etc.
+  resourceId  String?  @map("resource_id")
+  oldValues   Json?    @map("old_values")
+  newValues   Json?    @map("new_values")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  sessionId   String?  @map("session_id")
+  requestId   String?  @map("request_id")
+  timestamp   DateTime @default(now())
+  severity    String   @default("INFO") // 'INFO', 'WARNING', 'ERROR', 'CRITICAL'
+  category    String   @default("GENERAL") // 'SECURITY', 'AUTH', 'DATA', 'SYSTEM'
+  
+  // Relations
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([timestamp])
+  @@index([severity])
+  @@index([category])
+  @@map("audit_logs")
+}
+
+model DataProcessingRecord {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  purpose     String
+  legalBasis  String   @map("legal_basis")
+  dataTypes   Json     @map("data_types") // Array of data types processed
+  retention   String   // How long data will be retained
+  createdAt   DateTime @default(now()) @map("created_at")
+  expiresAt   DateTime @map("expires_at")
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("data_processing_records")
+}
+
+// API Key Management
+model ApiKey {
+  id               String   @id @default(cuid())
+  userId           String   @map("user_id")
+  name             String
+  description      String?
+  hashedKey        String   @map("hashed_key")
+  permissions      Json     // Array of permissions
+  expiresAt        DateTime? @map("expires_at")
+  rateLimitPerHour Int      @default(1000) @map("rate_limit_per_hour")
+  allowedIPs       Json     @default("[]") @map("allowed_ips") // Array of allowed IPs
+  allowedOrigins   Json     @default("[]") @map("allowed_origins") // Array of allowed origins
+  isActive         Boolean  @default(true) @map("is_active")
+  lastUsedAt       DateTime? @map("last_used_at")
+  usageCount       Int      @default(0) @map("usage_count")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([isActive])
+  @@index([expiresAt])
+  @@map("api_keys")
+}
+
+// Enhanced Session Management Models
+model SessionSecurityEvent {
+  id          String   @id @default(cuid())
+  sessionId   String   @map("session_id")
+  eventType   String   @map("event_type") // 'SUSPICIOUS_IP', 'MULTIPLE_DEVICES', etc.
+  riskScore   Float    @default(0.0) @map("risk_score")
+  details     Json?
+  timestamp   DateTime @default(now())
+  resolved    Boolean  @default(false)
+  resolvedAt  DateTime? @map("resolved_at")
+  resolvedBy  String?  @map("resolved_by")
+  
+  @@map("session_security_events")
+}
+
+// =============================================
+// Inventory & Order Management
+// =============================================
+
+enum ProductStatus {
+  ACTIVE
+  OUT_OF_STOCK
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum RestockPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum RestockStatus {
+  PENDING
+  COMPLETED
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdBy   String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  products    Product[]
+  creator     User?    @relation("CategoryCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@map("categories")
+}
+
+model Product {
+  id                String        @id @default(cuid())
+  name              String
+  sku               String        @unique
+  categoryId        String        @map("category_id")
+  price             Decimal       @db.Decimal(10, 2)
+  stock             Int           @default(0)
+  minStockThreshold Int           @default(5) @map("min_stock_threshold")
+  status            ProductStatus @default(ACTIVE)
+  description       String?
+  createdBy         String?       @map("created_by")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  category          Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  orderItems        OrderItem[]
+  restockEntries    RestockQueue[]
+  creator           User?         @relation("ProductCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([categoryId])
+  @@index([status])
+  @@index([stock])
+  @@map("products")
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique @map("order_number")
+  customerName  String      @map("customer_name")
+  totalAmount   Decimal     @default(0) @db.Decimal(12, 2) @map("total_amount")
+  status        OrderStatus @default(PENDING)
+  notes         String?
+  createdBy     String?     @map("created_by")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  items         OrderItem[]
+  creator       User?       @relation("OrderCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([customerName])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String  @id @default(cuid())
+  orderId    String  @map("order_id")
+  productId  String  @map("product_id")
+  quantity   Int
+  unitPrice  Decimal @db.Decimal(10, 2) @map("unit_price")
+  totalPrice Decimal @db.Decimal(12, 2) @map("total_price")
+
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, productId])
+  @@map("order_items")
+}
+
+model RestockQueue {
+  id              String          @id @default(cuid())
+  productId       String          @map("product_id")
+  currentStock    Int             @map("current_stock")
+  threshold       Int
+  priority        RestockPriority @default(MEDIUM)
+  status          RestockStatus   @default(PENDING)
+  restockedBy     String?         @map("restocked_by")
+  restockedAt     DateTime?       @map("restocked_at")
+  restockQuantity Int?            @map("restock_quantity")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  product         Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  restockedByUser User?           @relation("RestockedBy", fields: [restockedBy], references: [id], onDelete: SetNull)
+
+  @@index([priority])
+  @@index([status])
+  @@index([productId])
+  @@map("restock_queue")
+}
+
+model InventoryActivity {
+  id          String   @id @default(cuid())
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  description String
+  metadata    Json?
+  userId      String?  @map("user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User?    @relation("ActivityLogUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([entityType])
+  @@map("inventory_activities")
+}

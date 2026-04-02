@@ -1,0 +1,9 @@
+packages:
+  - '.'
+
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - '@scarf/scarf'
+  - prisma
+  - unrs-resolver

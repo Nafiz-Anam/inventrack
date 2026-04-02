@@ -1,0 +1,21 @@
+{
+    "python.formatting.provider": "yapf",
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "explicit"
+    },
+    "typescript.preferences.importModuleSpecifier": "relative",
+    "typescript.suggest.autoImports": true,
+    "files.associations": {
+        "*.prisma": "prisma"
+    },
+    "emmet.includeLanguages": {
+        "typescript": "html"
+    },
+    "files.exclude": {
+        "**/node_modules": true,
+        "**/build": true,
+        "**/.git": true
+    }
+}

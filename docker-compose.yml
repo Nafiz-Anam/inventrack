@@ -1,0 +1,111 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: inventrk-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      POSTGRES_DB: inventrackdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: inventrk-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Backend API Server
+  server:
+    container_name: inventrk-server
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      NODE_ENV: development
+      PORT: 8000
+      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/inventrackdb?schema=public
+      JWT_SECRET: super-secret-jwt-key-for-inventracker-2024
+      JWT_ACCESS_EXPIRATION_MINUTES: 30
+      JWT_REFRESH_EXPIRATION_DAYS: 30
+      JWT_RESET_PASSWORD_EXPIRATION_MINUTES: 10
+      JWT_VERIFY_EMAIL_EXPIRATION_MINUTES: 10
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USERNAME: noreply@example.com
+      SMTP_PASSWORD: placeholder-password
+      EMAIL_FROM: noreply@inventracker.com
+      CLIENT_URL: http://localhost:3000
+    volumes:
+      - ./server/src:/usr/src/app/src
+      - ./server/prisma:/usr/src/app/prisma
+      - ./server/docker-entrypoint.sh:/usr/src/app/docker-entrypoint.sh
+      - /usr/src/app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  # Frontend Next.js App
+  client:
+    container_name: inventrk-client
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/v1
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./client/src:/app/src
+      - ./client/public:/app/public
+      - ./client/next.config.ts:/app/next.config.ts
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - server
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

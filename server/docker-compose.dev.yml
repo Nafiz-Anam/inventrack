@@ -1,0 +1,56 @@
+services:
+  node-app:
+    container_name: node-app-dev
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .env
+    ports:
+      - "8001:8000"
+    volumes:
+      - .:/usr/src/node-app
+      - /usr/src/node-app/node_modules
+    depends_on:
+      - redis
+    networks:
+      - node-network
+
+  redis:
+    image: redis/redis-stack-server:latest
+    container_name: redis-dev
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+      - ./docker/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - node-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: redis-insight-dev
+    ports:
+      - "8002:5540"
+    volumes:
+      - redis_insight_data:/data
+    networks:
+      - node-network
+    depends_on:
+      - redis
+
+volumes:
+  redis_data:
+    driver: local
+  redis_insight_data:
+    driver: local
+
+networks:
+  node-network:
+    driver: bridge
