@@ -48,7 +48,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: sh -c "npx prisma db push --skip-generate && node build/prisma/seed.js 2>/dev/null; node build/src/index.js"
+    command: sh -c "node node_modules/prisma/build/index.js db push && node build/prisma/seed.js; node build/src/index.js"
 
   client:
     image: ${DOCKERHUB_USERNAME}/inventrack-client:latest
