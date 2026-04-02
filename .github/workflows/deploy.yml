@@ -1,0 +1,172 @@
+name: CI/CD - Build & Deploy to VPS via Docker Hub
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  # Docker Hub configuration
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+  # Image names
+  SERVER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/inventrack-server
+  CLIENT_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/inventrack-client
+  # VPS configuration
+  VPS_HOST: ${{ secrets.VPS_HOST }}
+  VPS_USER: ${{ secrets.VPS_USER }}
+
+jobs:
+  # Build and Push Docker Images
+  build-and-push:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Server image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          push: true
+          tags: |
+            ${{ env.SERVER_IMAGE }}:latest
+            ${{ env.SERVER_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # No cache: NEXT_PUBLIC_* is baked at build time; GHA layer cache can keep an
+      # old bundle if only secrets / env URLs change.
+      - name: Build and push Client image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./client
+          file: ./client/Dockerfile
+          push: true
+          no-cache: true
+          tags: |
+            ${{ env.CLIENT_IMAGE }}:latest
+            ${{ env.CLIENT_IMAGE }}:${{ github.sha }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+
+  # Deploy to VPS
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to VPS via Docker Compose
+        env:
+          DEPLOY_DIR: /root/inventrack
+        run: |
+          echo "=== Starting Docker Hub Deployment to VPS ==="
+
+          # Create deployment directory on VPS
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p ${DEPLOY_DIR}"
+
+          # Upload docker-compose.prod.yml to VPS
+          echo "Uploading docker-compose.prod.yml..."
+          scp -i ~/.ssh/deploy_key docker-compose.prod.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${DEPLOY_DIR}/docker-compose.yml
+
+          # Deploy on VPS - Pull new images and restart
+          echo "Pulling latest images and deploying..."
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << EOF
+            cd ${DEPLOY_DIR}
+
+            # Login to Docker Hub on VPS
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+
+            # Create root .env for docker-compose image references
+            cat > .env << 'ENVFILE'
+          DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          ENVFILE
+
+            # Create server env file if it doesn't exist
+            if [ ! -f server.env ]; then
+              cat > server.env << 'ENVFILE'
+          NODE_ENV=production
+          PORT=8000
+          DATABASE_URL=postgresql://postgres:${{ secrets.POSTGRES_PASSWORD }}@postgres:5432/inventrackdb?schema=public
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_ACCESS_EXPIRATION_MINUTES=30
+          JWT_REFRESH_EXPIRATION_DAYS=30
+          JWT_RESET_PASSWORD_EXPIRATION_MINUTES=10
+          JWT_VERIFY_EMAIL_EXPIRATION_MINUTES=10
+          REDIS_HOST=redis
+          REDIS_PORT=6379
+          REDIS_DB=0
+          CLIENT_URL=https://inventrack.agiloit.store
+          ENVFILE
+            fi
+
+            # Create client env file if it doesn't exist
+            if [ ! -f client.env ]; then
+              cat > client.env << 'ENVFILE'
+          NODE_ENV=production
+          HOSTNAME=0.0.0.0
+          NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+          ENVFILE
+            fi
+
+            # Pull latest images
+            echo "Pulling latest Docker images..."
+            docker compose pull
+
+            # Stop existing containers and start new ones
+            echo "Restarting containers..."
+            docker compose down 2>/dev/null || true
+            docker compose up -d
+
+            # Cleanup old images
+            docker image prune -f
+
+            echo "Deployment completed successfully!"
+          EOF
+
+          # Cleanup
+          rm -f ~/.ssh/deploy_key
+
+      - name: Verify Deployment
+        run: |
+          echo "Verifying deployment..."
+          sleep 15
+
+          # Setup SSH for verification
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+          # Check if containers are running
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /root/inventrack && docker compose ps"
+
+          echo "Deployment verification complete!"
+          echo "App: https://inventrack.agiloit.store"
+          echo "API: https://api.inventrack.agiloit.store"
+          rm -f ~/.ssh/deploy_key
+        continue-on-error: true

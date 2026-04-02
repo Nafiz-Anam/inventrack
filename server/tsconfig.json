@@ -22,6 +22,6 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["src", "scripts/*.ts", "tests"],
+  "include": ["src", "prisma", "scripts/*.ts", "tests"],
   "exclude": ["node_modules", "build", "dist"]
 }

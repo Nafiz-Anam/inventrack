@@ -1,48 +1,54 @@
-# Multi-stage build for production optimization
+# Multi-stage production build
 FROM node:22-alpine AS base
+RUN apk add --no-cache libc6-compat openssl
 
-# Install dependencies only when needed
+# ── Install dependencies ──
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
-WORKDIR /usr/src/node-app
+WORKDIR /app
+COPY package.json pnpm-lock.yaml* ./
+RUN corepack enable && corepack prepare pnpm@latest --activate \
+    && pnpm install --frozen-lockfile || pnpm install
 
-# Install dependencies with pnpm only
-COPY package.json ./
-RUN npm install -g pnpm@latest && pnpm install
-
-# Rebuild the source code only when needed
+# ── Build ──
 FROM base AS builder
-WORKDIR /usr/src/node-app
-COPY --from=deps /usr/src/node-app/node_modules ./node_modules
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@latest --activate
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# Generate Prisma client at build time
-RUN pnpm dlx prisma generate
-
-# Build the application
+RUN npx prisma generate
 RUN pnpm build
 
-# Production image, copy all the files and run the app
+# ── Production dependencies only ──
+FROM base AS prod-deps
+WORKDIR /app
+COPY package.json pnpm-lock.yaml* ./
+RUN corepack enable && corepack prepare pnpm@latest --activate \
+    && pnpm install --prod --frozen-lockfile || pnpm install --prod
+
+# ── Runner ──
 FROM node:22-alpine AS runner
-WORKDIR /usr/src/node-app
+RUN apk add --no-cache openssl
+WORKDIR /app
 
-ENV NODE_ENV production
+ENV NODE_ENV=production
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nodejs
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 appuser
 
-# Copy built application
-COPY --from=builder /usr/src/node-app/dist ./dist
-COPY --from=builder /usr/src/node-app/node_modules ./node_modules
-COPY --from=builder /usr/src/node-app/package.json ./package.json
-COPY --from=builder /usr/src/node-app/prisma ./prisma
+# Production node_modules (smaller)
+COPY --from=prod-deps /app/node_modules ./node_modules
+# Built app
+COPY --from=builder /app/build ./build
+COPY --from=builder /app/package.json ./package.json
+# Prisma schema + generated client
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
-# Create app directory and set permissions
-RUN mkdir -p /usr/src/node-app && chown -R nodejs:nodejs /usr/src/node-app
-USER nodejs
+RUN chown -R appuser:nodejs /app
+USER appuser
 
 EXPOSE 8000
+ENV PORT=8000
 
-ENV PORT 8000
-
-CMD ["pnpm", "start"]
+CMD ["node", "build/src/index.js"]
