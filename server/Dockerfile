@@ -19,13 +19,8 @@ ARG DATABASE_URL
 ENV DATABASE_URL=$DATABASE_URL
 RUN npx prisma generate
 RUN pnpm build
-
-# ── Production dependencies only ──
-FROM base AS prod-deps
-WORKDIR /app
-COPY package.json pnpm-lock.yaml* ./
-RUN corepack enable && corepack prepare pnpm@latest --activate \
-    && pnpm install --prod --frozen-lockfile || pnpm install --prod
+# Remove devDependencies after build
+RUN pnpm prune --prod
 
 # ── Runner ──
 FROM node:22-alpine AS runner
@@ -37,14 +32,11 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 appuser
 
-# Production node_modules (smaller)
-COPY --from=prod-deps /app/node_modules ./node_modules
-# Built app
+# Copy everything needed from builder (includes generated Prisma client in pnpm store)
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./package.json
-# Prisma schema + generated client (Prisma 7 generates inside @prisma/client)
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 RUN chown -R appuser:nodejs /app
 USER appuser
