@@ -19,8 +19,9 @@ ARG DATABASE_URL
 ENV DATABASE_URL=$DATABASE_URL
 RUN npx prisma generate
 RUN pnpm build
-# Remove devDependencies after build
-RUN pnpm prune --prod
+# Remove devDependencies after build, then re-generate Prisma client
+# (prune can break the generated client in pnpm's .prisma store)
+RUN pnpm prune --prod && npx prisma generate
 
 # ── Runner ──
 FROM node:22-alpine AS runner
@@ -37,6 +38,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
 RUN chown -R appuser:nodejs /app
 USER appuser

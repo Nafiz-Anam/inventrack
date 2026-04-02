@@ -2,7 +2,7 @@ import express from 'express';
 import authRoute from './auth.route';
 import userRoute from './user.route';
 import meRoute from './me.routes';
-import docsRoute from './docs.route';
+
 import twoFactorRoute from './twoFactor.route';
 import deviceRoute from './device.route';
 import profileRoute from './profile.route';
@@ -102,36 +102,16 @@ const defaultRoutes = [
   },
 ];
 
-// routes available only in development mode
-const devRoutes = [
-  {
-    path: '/docs',
-    route: docsRoute,
-  },
-];
-
-// routes available in production with authentication
-const prodRoutes = [
-  {
-    path: '/docs',
-    route: docsRoute,
-  },
-];
 
 // Debug log to check route registration
 defaultRoutes.forEach(route => {
   router.use(route.path, route.route);
 });
 
+// Docs route uses devDependencies (swagger-jsdoc) — lazy load only in dev
 if (config.env === 'development') {
-  devRoutes.forEach(route => {
-    router.use(route.path, route.route);
-  });
-} else if (config.env === 'production') {
-  // In production, docs are available but should be protected
-  prodRoutes.forEach(route => {
-    router.use(route.path, route.route);
-  });
+  const docsRoute = require('./docs.route').default;
+  router.use('/docs', docsRoute);
 }
 
 export default router;

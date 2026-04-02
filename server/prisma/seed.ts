@@ -20,17 +20,14 @@ function randomDate(daysBack: number): Date {
 }
 
 async function main() {
-  console.log('Clearing existing data...');
-  await prisma.inventoryActivity.deleteMany();
-  await prisma.restockQueue.deleteMany();
-  await prisma.orderItem.deleteMany();
-  await prisma.order.deleteMany();
-  await prisma.product.deleteMany();
-  await prisma.category.deleteMany();
-  await prisma.device.deleteMany();
-  await prisma.userSession.deleteMany();
-  await prisma.token.deleteMany();
+  // Check if DB already has data — skip seeding if so
+  const existingUsers = await prisma.user.count();
+  if (existingUsers > 0) {
+    console.log('Database already seeded. Skipping.');
+    return;
+  }
 
+  console.log('Empty database detected. Seeding...');
   console.log('Seeding users...');
   const hashedDemo = await bcrypt.hash('Demo@1234', 10);
   const hashedAdmin = await bcrypt.hash('Admin@1234', 10);
