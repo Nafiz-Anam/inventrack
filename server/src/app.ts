@@ -56,7 +56,12 @@ app.use(compression());
 app.use(
   cors({
     origin: config.clientUrl
-      ? [config.clientUrl, 'http://localhost:3001', 'http://localhost:3000']
+      ? [
+          config.clientUrl,
+          config.clientUrl.replace('https://', 'http://'),
+          'http://localhost:3001',
+          'http://localhost:3000',
+        ]
       : '*',
     credentials: true,
   })
