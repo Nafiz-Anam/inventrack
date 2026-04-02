@@ -3,7 +3,16 @@ import prisma from '../client';
 import ApiError from '../utils/ApiError';
 import inventoryActivityService from './inventoryActivity.service';
 import productService from './product.service';
+import cacheService, { CacheKeys } from './cache.service';
 import { OrderStatus } from '@prisma/client';
+
+const invalidateOrderCache = async () => {
+  await cacheService.delPattern('inventory:orders:*');
+  await cacheService.delPattern('inventory:products:*');
+  await cacheService.delPattern('inventory:product:*');
+  await cacheService.delPattern('inventory:restock:*');
+  await cacheService.del(CacheKeys.DASHBOARD_STATS);
+};
 
 /**
  * Generate order number with collision retry.
@@ -159,7 +168,7 @@ const createOrder = async (
         timeout: 10000,
       });
 
-      // Activity log outside transaction (non-critical)
+      await invalidateOrderCache();
       await inventoryActivityService.logActivity(
         'CREATE', 'Order',
         `Order ${order.orderNumber} created by user`,
@@ -277,6 +286,7 @@ const updateOrderStatus = async (orderId: string, status: OrderStatus, userId?: 
     });
   });
 
+  await invalidateOrderCache();
   await inventoryActivityService.logActivity(
     'UPDATE', 'Order', `Order ${updated.orderNumber} marked as ${status}`, updated.id, undefined, userId
   );
@@ -332,6 +342,7 @@ const cancelOrder = async (orderId: string, userId?: string) => {
     timeout: 10000,
   });
 
+  await invalidateOrderCache();
   await inventoryActivityService.logActivity(
     'CANCEL', 'Order', `Order ${updated.orderNumber} cancelled`, updated.id, undefined, userId
   );
@@ -377,6 +388,7 @@ const deleteOrder = async (orderId: string, userId?: string) => {
     timeout: 10000,
   });
 
+  await invalidateOrderCache();
   await inventoryActivityService.logActivity(
     'DELETE', 'Order', `Order ${order.orderNumber} deleted`, orderId, undefined, userId
   );

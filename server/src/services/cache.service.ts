@@ -35,6 +35,9 @@ class CacheService {
       this.isConnected = false;
       logger.warn('Redis connection closed');
     });
+
+    // Auto-connect
+    this.redis.connect().catch(() => {});
   }
 
   /**
@@ -192,6 +195,23 @@ class CacheService {
   }
 
   /**
+   * Delete all keys matching a pattern (e.g. "inventory:products:*")
+   */
+  async delPattern(pattern: string): Promise<boolean> {
+    if (!this.isConnected) return false;
+    try {
+      const keys = await this.redis.keys(pattern);
+      if (keys.length > 0) {
+        await this.redis.del(...keys);
+      }
+      return true;
+    } catch (error) {
+      logger.error('Cache delPattern error:', { pattern, error });
+      return false;
+    }
+  }
+
+  /**
    * Clear all cache
    */
   async flush(): Promise<boolean> {
@@ -302,6 +322,14 @@ export const CacheKeys = {
   USER_SEARCH: (query: string) => `search:users:${query}`,
   ADMIN_STATS: 'admin:stats',
   SYSTEM_CONFIG: 'system:config',
+  // Inventory & Orders
+  DASHBOARD_STATS: 'inventory:dashboard',
+  CATEGORIES_LIST: (params: string) => `inventory:categories:${params}`,
+  PRODUCTS_LIST: (params: string) => `inventory:products:${params}`,
+  PRODUCT_DETAIL: (id: string) => `inventory:product:${id}`,
+  ORDERS_LIST: (params: string) => `inventory:orders:${params}`,
+  RESTOCK_QUEUE: (params: string) => `inventory:restock:${params}`,
+  ACTIVITY_LOG: (params: string) => `inventory:activity:${params}`,
 } as const;
 
 // Default TTL values (in seconds)

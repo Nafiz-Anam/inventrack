@@ -2,6 +2,7 @@ import httpStatus from 'http-status';
 import prisma from '../client';
 import ApiError from '../utils/ApiError';
 import inventoryActivityService from './inventoryActivity.service';
+import cacheService, { CacheKeys } from './cache.service';
 
 const createCategory = async (data: { name: string; description?: string }, userId?: string) => {
   const existing = await prisma.category.findUnique({ where: { name: data.name } });
@@ -17,16 +18,14 @@ const createCategory = async (data: { name: string; description?: string }, user
     },
   });
 
-  await inventoryActivityService.logActivity(
-    'CREATE',
-    'Category',
-    `Category "${category.name}" created`,
-    category.id,
-    undefined,
-    userId
-  );
-
+  await invalidateCategoryCache();
+  await inventoryActivityService.logActivity('CREATE', 'Category', `Category "${category.name}" created`, category.id, undefined, userId);
   return category;
+};
+
+const invalidateCategoryCache = async () => {
+  await cacheService.delPattern('inventory:categories:*');
+  await cacheService.del(CacheKeys.DASHBOARD_STATS);
 };
 
 const getCategories = async (options: {
@@ -39,6 +38,9 @@ const getCategories = async (options: {
 }) => {
   const page = Number(options.page) || 1;
   const limit = Number(options.limit) || 10;
+  const cacheKey = CacheKeys.CATEGORIES_LIST(JSON.stringify({ ...options, page, limit }));
+  const cached = await cacheService.get(cacheKey);
+  if (cached) return cached;
   const skip = (page - 1) * limit;
 
   const where: any = {};
@@ -66,13 +68,9 @@ const getCategories = async (options: {
     prisma.category.count({ where }),
   ]);
 
-  return {
-    categories,
-    totalResults: total,
-    totalPages: Math.ceil(total / limit),
-    page,
-    limit,
-  };
+  const result = { categories, totalResults: total, totalPages: Math.ceil(total / limit), page, limit };
+  await cacheService.set(cacheKey, result, { ttl: 60 });
+  return result;
 };
 
 const getCategoryById = async (categoryId: string) => {
@@ -107,15 +105,8 @@ const updateCategory = async (
     data,
   });
 
-  await inventoryActivityService.logActivity(
-    'UPDATE',
-    'Category',
-    `Category "${updated.name}" updated`,
-    updated.id,
-    undefined,
-    userId
-  );
-
+  await invalidateCategoryCache();
+  await inventoryActivityService.logActivity('UPDATE', 'Category', `Category "${updated.name}" updated`, updated.id, undefined, userId);
   return updated;
 };
 
@@ -139,9 +130,8 @@ const deleteCategory = async (categoryId: string, userId?: string) => {
     return cat;
   });
 
-  await inventoryActivityService.logActivity(
-    'DELETE', 'Category', `Category "${category.name}" deleted`, categoryId, undefined, userId
-  );
+  await invalidateCategoryCache();
+  await inventoryActivityService.logActivity('DELETE', 'Category', `Category "${category.name}" deleted`, categoryId, undefined, userId);
 };
 
 export default {

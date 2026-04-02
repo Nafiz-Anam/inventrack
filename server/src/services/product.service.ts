@@ -2,7 +2,15 @@ import httpStatus from 'http-status';
 import prisma from '../client';
 import ApiError from '../utils/ApiError';
 import inventoryActivityService from './inventoryActivity.service';
-import { ProductStatus, RestockPriority, RestockStatus } from '@prisma/client';
+import cacheService, { CacheKeys } from './cache.service';
+import { ProductStatus, RestockPriority } from '@prisma/client';
+
+const invalidateProductCache = async () => {
+  await cacheService.delPattern('inventory:products:*');
+  await cacheService.delPattern('inventory:product:*');
+  await cacheService.delPattern('inventory:restock:*');
+  await cacheService.del(CacheKeys.DASHBOARD_STATS);
+};
 
 const calculatePriority = (stock: number, threshold: number): RestockPriority => {
   if (stock === 0) return 'HIGH';
@@ -94,6 +102,7 @@ const createProduct = async (
 
   // Evaluate restock queue
   await evaluateRestockQueue(product.id, data.stock, threshold);
+  await invalidateProductCache();
 
   await inventoryActivityService.logActivity(
     'CREATE',
@@ -118,6 +127,9 @@ const getProducts = async (options: {
 }) => {
   const page = Number(options.page) || 1;
   const limit = Number(options.limit) || 10;
+  const cacheKey = CacheKeys.PRODUCTS_LIST(JSON.stringify({ ...options, page, limit }));
+  const cached = await cacheService.get(cacheKey);
+  if (cached) return cached;
   const skip = (page - 1) * limit;
 
   const where: any = {};
@@ -145,13 +157,9 @@ const getProducts = async (options: {
     prisma.product.count({ where }),
   ]);
 
-  return {
-    products,
-    totalResults: total,
-    totalPages: Math.ceil(total / limit),
-    page,
-    limit,
-  };
+  const result = { products, totalResults: total, totalPages: Math.ceil(total / limit), page, limit };
+  await cacheService.set(cacheKey, result, { ttl: 60 });
+  return result;
 };
 
 const getProductById = async (productId: string) => {
@@ -214,6 +222,7 @@ const updateProduct = async (
   // Re-evaluate restock queue
   const threshold = data.minStockThreshold ?? product.minStockThreshold;
   await evaluateRestockQueue(productId, newStock, threshold);
+  await invalidateProductCache();
 
   await inventoryActivityService.logActivity(
     'UPDATE',
@@ -249,9 +258,8 @@ const deleteProduct = async (productId: string, userId?: string) => {
     await tx.product.delete({ where: { id: productId } });
   });
 
-  await inventoryActivityService.logActivity(
-    'DELETE', 'Product', `Product "${product.name}" deleted`, productId, undefined, userId
-  );
+  await invalidateProductCache();
+  await inventoryActivityService.logActivity('DELETE', 'Product', `Product "${product.name}" deleted`, productId, undefined, userId);
 };
 
 export default {

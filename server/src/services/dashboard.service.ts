@@ -1,7 +1,11 @@
 import prisma from '../client';
 import inventoryActivityService from './inventoryActivity.service';
+import cacheService, { CacheKeys } from './cache.service';
 
 const getDashboardStats = async () => {
+  // Try cache first (30 second TTL — dashboard refreshes frequently)
+  const cached = await cacheService.get(CacheKeys.DASHBOARD_STATS);
+  if (cached) return cached;
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date();
@@ -124,7 +128,7 @@ const getDashboardStats = async () => {
     });
   }
 
-  return {
+  const result = {
     totalOrdersToday,
     pendingOrders,
     completedOrders,
@@ -138,6 +142,11 @@ const getDashboardStats = async () => {
     revenueChart: last7Days,
     recentOrders,
   };
+
+  // Cache for 30 seconds
+  await cacheService.set(CacheKeys.DASHBOARD_STATS, result, { ttl: 30 });
+
+  return result;
 };
 
 export default { getDashboardStats };

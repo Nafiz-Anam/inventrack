@@ -2,7 +2,15 @@ import httpStatus from 'http-status';
 import prisma from '../client';
 import ApiError from '../utils/ApiError';
 import inventoryActivityService from './inventoryActivity.service';
+import cacheService, { CacheKeys } from './cache.service';
 import { RestockPriority, RestockStatus } from '@prisma/client';
+
+const invalidateRestockCache = async () => {
+  await cacheService.delPattern('inventory:restock:*');
+  await cacheService.delPattern('inventory:products:*');
+  await cacheService.delPattern('inventory:product:*');
+  await cacheService.del(CacheKeys.DASHBOARD_STATS);
+};
 
 const getRestockQueue = async (options: {
   page?: number | string;
@@ -12,6 +20,9 @@ const getRestockQueue = async (options: {
 }) => {
   const page = Number(options.page) || 1;
   const limit = Number(options.limit) || 10;
+  const cacheKey = CacheKeys.RESTOCK_QUEUE(JSON.stringify({ ...options, page, limit }));
+  const cached = await cacheService.get(cacheKey);
+  if (cached) return cached;
   const skip = (page - 1) * limit;
 
   const where: any = {};
@@ -29,7 +40,9 @@ const getRestockQueue = async (options: {
     prisma.restockQueue.count({ where }),
   ]);
 
-  return { items, totalResults: total, totalPages: Math.ceil(total / limit), page, limit };
+  const result = { items, totalResults: total, totalPages: Math.ceil(total / limit), page, limit };
+  await cacheService.set(cacheKey, result, { ttl: 60 });
+  return result;
 };
 
 /**
@@ -81,6 +94,7 @@ const restockProduct = async (restockId: string, quantity: number, userId?: stri
     return updated;
   });
 
+  await invalidateRestockCache();
   await inventoryActivityService.logActivity(
     'RESTOCK', 'Product',
     `Stock updated for "${result.product.name}" (+${quantity} units)`,
@@ -103,6 +117,7 @@ const deleteRestockEntry = async (restockId: string, userId?: string) => {
   }
 
   await prisma.restockQueue.delete({ where: { id: restockId } });
+  await invalidateRestockCache();
 
   await inventoryActivityService.logActivity(
     'DELETE', 'RestockQueue',

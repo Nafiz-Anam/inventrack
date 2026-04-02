@@ -17,6 +17,7 @@ A full-stack web application for managing products, stock levels, customer order
 - [Authentication & Authorization](#authentication--authorization)
 - [Business Logic](#business-logic)
 - [Race Condition Handling](#race-condition-handling)
+- [Redis Caching](#redis-caching)
 - [Docker Setup](#docker-setup)
 - [Local Development](#local-development)
 - [Seed Data](#seed-data)
@@ -69,7 +70,7 @@ A full-stack web application for managing products, stock levels, customer order
 | **Node.js 22** + **TypeScript 5.9** | Runtime & type safety |
 | **Express.js 5** | Web framework |
 | **Prisma 7.5** + **PostgreSQL 15** | ORM + database |
-| **Redis 7** (ioredis) | Caching + sessions |
+| **Redis 7** (ioredis) | Cache-aside layer for API responses + session store |
 | **Zod 4** | Request validation |
 | **JWT** (jsonwebtoken) + **Passport.js** | Authentication |
 | **bcryptjs** | Password hashing |
@@ -484,6 +485,46 @@ All critical operations use **Serializable isolation** transactions with retry l
 | Restock queue evaluation | Transaction-aware `evaluateRestockQueueTx()` |
 | Category deletion | Product count + delete in single tx |
 | Product deletion | Active orders check + delete in single tx |
+
+---
+
+## Redis Caching
+
+The application uses Redis as a cache-aside layer to reduce database load on read-heavy endpoints. All caching is transparent — if Redis is unavailable, the app falls back to direct database queries with zero downtime impact.
+
+### Cache Configuration
+
+| Endpoint | Cache Key Pattern | TTL | Description |
+|----------|-------------------|-----|-------------|
+| Dashboard stats | `inventory:dashboard` | 30s | All KPIs, charts, recent data |
+| Categories list | `inventory:categories:{params}` | 60s | Paginated, parameterized by query |
+| Products list | `inventory:products:{params}` | 60s | Paginated, parameterized by filters |
+| Restock queue | `inventory:restock:{params}` | 60s | Paginated, parameterized by priority |
+
+### Cache Invalidation
+
+Every write operation invalidates all affected caches using pattern-based deletion:
+
+| Mutation | Caches Invalidated |
+|----------|-------------------|
+| Category create/update/delete | `categories:*` + dashboard |
+| Product create/update/delete | `products:*` + `product:*` + `restock:*` + dashboard |
+| Order create/cancel/update/delete | `orders:*` + `products:*` + `product:*` + `restock:*` + dashboard |
+| Restock product | `restock:*` + `products:*` + `product:*` + dashboard |
+
+### Implementation Details
+
+- **Cache-aside pattern**: Check cache → miss → query DB → store in cache → return
+- **Pattern invalidation**: `delPattern('inventory:products:*')` clears all product list cache variants
+- **Graceful degradation**: All cache methods return `null`/`false` on Redis failure — no errors thrown
+- **Auto-connect**: Redis connects on server startup; lazy reconnect on failure
+- **Serialization**: All cached values are JSON serialized/deserialized automatically
+
+### Key Files
+
+- `server/src/services/cache.service.ts` — CacheService singleton with `get`, `set`, `del`, `delPattern`, `wrap` methods
+- `CacheKeys` — Centralized cache key constants
+- `CacheTTL` — Predefined TTL values (SHORT=60s, MEDIUM=300s, LONG=900s, HOUR, DAY)
 
 ---
 
