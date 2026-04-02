@@ -9,7 +9,7 @@ const createOrder = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getOrders = catchAsync(async (req: Request, res: Response) => {
-  const result = await orderService.getOrders(req.query as any);
+  const result: any = await orderService.getOrders(req.query as any);
   return sendPaginated(
     res,
     result.orders,

@@ -9,7 +9,7 @@ const createCategory = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getCategories = catchAsync(async (req: Request, res: Response) => {
-  const result = await categoryService.getCategories(req.query as any);
+  const result: any = await categoryService.getCategories(req.query as any);
   return sendPaginated(
     res,
     result.categories,

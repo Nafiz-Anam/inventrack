@@ -4,7 +4,7 @@ import inventoryActivityService from '../services/inventoryActivity.service';
 import { Request, Response } from 'express';
 
 const getActivities = catchAsync(async (req: Request, res: Response) => {
-  const result = await inventoryActivityService.getActivities(req.query as any);
+  const result: any = await inventoryActivityService.getActivities(req.query as any);
   return sendPaginated(
     res,
     result.activities,

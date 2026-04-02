@@ -1,0 +1,73 @@
+#!/bin/bash
+# Pre-commit hook to check build before committing
+# This prevents broken builds from being committed
+
+echo "🔍 Running pre-commit checks..."
+
+# Get the root directory of the git repository
+ROOT_DIR=$(git rev-parse --show-toplevel)
+
+# Check if client files are being committed
+if git diff --cached --name-only | grep -q "^client/"; then
+    echo "📦 Client files changed. Running build check..."
+
+    cd "$ROOT_DIR/client"
+
+    # Install dependencies if needed
+    if [ ! -d "node_modules" ]; then
+        echo "📥 Installing client dependencies..."
+        pnpm install
+    fi
+
+    # Run type check
+    echo "🔍 Running TypeScript type check..."
+    if ! pnpm type-check; then
+        echo "❌ TypeScript type check failed!"
+        echo "Please fix type errors before committing."
+        exit 1
+    fi
+
+    # Run build
+    echo "🏗️  Running production build..."
+    if ! pnpm build; then
+        echo "❌ Build failed!"
+        echo "Please fix build errors before committing."
+        exit 1
+    fi
+
+    echo "✅ Client build check passed!"
+fi
+
+# Check if server files are being committed
+if git diff --cached --name-only | grep -q "^server/"; then
+    echo "📦 Server files changed. Running build check..."
+
+    cd "$ROOT_DIR/server"
+
+    # Install dependencies if needed
+    if [ ! -d "node_modules" ]; then
+        echo "📥 Installing server dependencies..."
+        pnpm install
+    fi
+
+    # Run type check
+    echo "🔍 Running TypeScript type check..."
+    if ! pnpm type-check; then
+        echo "❌ TypeScript type check failed!"
+        echo "Please fix type errors before committing."
+        exit 1
+    fi
+
+    # Run build
+    echo "🏗️  Running production build..."
+    if ! pnpm build; then
+        echo "❌ Build failed!"
+        echo "Please fix build errors before committing."
+        exit 1
+    fi
+
+    echo "✅ Server build check passed!"
+fi
+
+echo "✅ All pre-commit checks passed! Proceeding with commit..."
+exit 0

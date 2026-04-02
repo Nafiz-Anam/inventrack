@@ -9,7 +9,7 @@ const createProduct = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getProducts = catchAsync(async (req: Request, res: Response) => {
-  const result = await productService.getProducts(req.query as any);
+  const result: any = await productService.getProducts(req.query as any);
   return sendPaginated(
     res,
     result.products,

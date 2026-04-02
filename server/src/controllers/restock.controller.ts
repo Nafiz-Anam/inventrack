@@ -4,7 +4,7 @@ import restockService from '../services/restock.service';
 import { Request, Response } from 'express';
 
 const getRestockQueue = catchAsync(async (req: Request, res: Response) => {
-  const result = await restockService.getRestockQueue(req.query as any);
+  const result: any = await restockService.getRestockQueue(req.query as any);
   return sendPaginated(
     res,
     result.items,
