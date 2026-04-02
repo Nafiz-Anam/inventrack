@@ -42,9 +42,8 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 # Built app
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./package.json
-# Prisma schema + generated client
+# Prisma schema + generated client (Prisma 7 generates inside @prisma/client)
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 RUN chown -R appuser:nodejs /app
